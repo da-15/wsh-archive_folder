@@ -1,0 +1,165 @@
+<!--
+2016.08.01 kuroda 作業メモファイルを作成する
+
+-->
+
+<job id="cf_cc">
+<script language="VBScript">
+	function vbinput(msg)
+		vbinput = InputBox(msg) 'ユーザ入力値を返す
+	end function
+</script>
+
+<script language="JavaScript">
+	//作成するファイルのフォーマット。
+	//[$date]には、YYYYMMDDにて日付が入ります。
+	//[$time]には、hhmissにて時刻が入ります。
+	//[$name]には、引数で指定されたファイル名が入ります。
+	var strFolderNameFormat = '[$date] [$name]';
+	
+	//本スクリプトファイルと同様の場所(もしくはショートカット設定項目の"作業フォルダ")に出力したい場合は空のままにする。
+	var strPathCreateFolder = '';
+	
+	//ファイル名として不正な記号（\/:*?"<>|）が指定された場合に置き換える文字
+	var REPLACE_NG_CHAR = '-';
+	
+	//ファイル名が指定されなかった場合の文字列
+	var REPLACE_NO_TITLE = '';
+	
+	//-----------------------------------------------
+	// メッセージ 
+	var msg = new Array(10);
+	msg[0]='ファイルが既に存在しています。\n既存のフォルダを開きます。\n\nファイル名[[$file_name]]';
+	msg[1]='テキストエディタのオープンに失敗しました。\n\nファイル名[[$editor_name]]';
+	msg[2]='引数の指定が不正です。デフォルトのフォルダ名で開きます。';
+	msg[3]='指定されたフォルダが存在しません。\n指定した出力先を確認ください。\n[[$folder_name]]\n\nデフォルトのフォルダ（スクリプトファイルと同様の場所）に出力します。';
+	msg[4]='フォルダ名を入力してください。';
+	msg[5]='';
+	msg[6]='';
+	msg[7]='';
+	msg[8]='';
+	msg[9]='';
+	
+	
+	//--------------------------------------------------
+	// メイン処理
+	var fso; 
+	var newFile; 
+	var objParm;
+	var strDate; //日付 yyyymmdd
+	var strTime; //時刻 hhmiss
+	var strFolderName; //生成するファイル名
+	var strMemoName; //引数に指定されたファイル名
+	var objWShell = new ActiveXObject("WScript.Shell");
+	
+	//引数をチェック -- フォルダ名を取得
+	objParm = WScript.arguments;
+	if(objParm.length > 1){
+		//引数が不正（複数指定された場合）
+		strMemoName = REPLACE_NO_TITLE;
+		WScript.Echo(msg[2]);
+	} else if(objParm.length < 1){
+		//引数なし
+		
+		//ダイアログによる入力
+		strMemoName = vbinput(msg[4]);
+		if(strMemoName == ''){
+			//空入力
+			strMemoName = REPLACE_NO_TITLE;
+		}
+		else if(strMemoName == null){
+			//キャンセル押下
+			WScript.Quit();
+		}
+	} else{
+		//引数あり
+		strMemoName = objParm(0);
+	}
+	
+	//日付を取得yyyymmdd
+	strDate = getFormatedDate(new Date());
+	//時刻を取得 hhmiss
+	strTime = getFormatedTime(new Date());
+	
+	//ファイル名を取得
+	strFolderName = strFolderNameFormat;
+	strFolderName = strFolderName.replace('[$date]', strDate);
+	strFolderName = strFolderName.replace('[$time]', strTime);
+	strFolderName = strFolderName.replace('[$name]', strMemoName);
+	
+	//ファイルに不適切な記号を-に置き換え
+	strFolderName = strFolderName.replace(/[\/:*?"<>|]/g, REPLACE_NG_CHAR);
+
+	
+	//ファイルを生成する
+	fso = new ActiveXObject('Scripting.FileSystemObject');
+	
+	//フォルダ生成先が指定してある場合
+	if(strPathCreateFolder != ''){
+		if(fso.FolderExists(strPathCreateFolder)){
+			objWShell.CurrentDirectory = strPathCreateFolder;
+		}else{
+			WScript.Echo(msg[3].replace('[$folder_name]', strPathCreateFolder));
+		}
+	}
+	
+	//ファイルの存在チェック
+	if(fso.FolderExists(strFolderName) == false){
+		newFile = fso.CreateFolder(strFolderName);
+		
+	}else{
+		//ファイルが既に存在している場合
+		WScript.Echo(msg[0].replace('[$file_name]', strFolderName));
+	}
+	
+	//フォルダを開きます
+	objWShell.Run("rundll32.exe url.dll,FileProtocolHandler " + strFolderName, 1, false);
+	
+	
+	//--------------------------------------------------
+	// 日付フォーマット作成用関数 yyyymmdd
+	function getFormatedDate(dtDate){
+		var strDate; //日付文字列
+		
+		strDate = '';
+		strDate += dtDate.getYear(); //年 yyyy
+		strDate += formatString(dtDate.getMonth()+1, 2); //月 mm
+		strDate += formatString(dtDate.getDate(), 2); //日 dd
+		
+		
+		//yyyymmddのフォーマットで日付を返す
+		return strDate;
+	}
+	
+	function getFormatedTime(dtDate){
+		var strTime; //時刻文字列
+		strTime = '';
+		strTime += formatString(dtDate.getHours(), 2); //時 hh
+		strTime += '';
+		strTime += formatString(dtDate.getMinutes(), 2); //分 mi
+		strTime += '';
+		strTime += formatString(dtDate.getSeconds(), 2); //秒 ss
+		
+		//hhmissのフォーマットで時刻を返す
+		return strTime;
+	}
+	
+	// 例）
+	// 2→02にする。
+	// numStrLen 返す文字列の長さを指定
+	function formatString(strNum, numStrLen){
+		var strBuf;
+		var i;
+		
+		strBuf = '' + strNum;
+		//元の文字よりも返す文字列の指定のほうが短い場合は何もしない
+		if(strBuf.length < numStrLen){
+			// 数値の前に0を付与
+			for(i=strBuf.length; i < numStrLen; i++){
+				strBuf = '0' + strBuf;
+			}
+		}
+		return strBuf;
+	}
+</script>
+</job>
